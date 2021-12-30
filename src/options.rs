@@ -59,6 +59,10 @@ pub struct Options {
     /// the mode to run as
     #[argh(subcommand)]
     pub mode: Mode,
+
+    /// enable tokio tracing
+    #[argh(switch)]
+    pub tracing: bool,
 }
 
 impl Options {

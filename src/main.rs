@@ -17,9 +17,14 @@ fn init_logging() -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    init_logging()?;
-
     let options: options::Options = argh::from_env();
+
+    // TODO: make this not mutually exclusive
+    if options.tracing {
+        console_subscriber::init();
+    } else {
+        init_logging()?;
+    }
 
     let mut handles = Vec::new();
 
@@ -44,6 +49,12 @@ async fn main() -> anyhow::Result<()> {
             }
             Err(err) => error!("Error: {}", err),
         }
+    }
+
+    // stdin polling will block the client exiting
+    // so just force it for now
+    if options.is_client() {
+        std::process::exit(1);
     }
 
     Ok(())

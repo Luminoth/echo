@@ -5,23 +5,23 @@ use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
 
 async fn handle_connection(
-    mut socket: TcpStream,
+    mut stream: TcpStream,
     addr: SocketAddr,
-    _silent: bool,
+    silent: bool,
 ) -> anyhow::Result<()> {
     let mut buf = [0; 1024];
     loop {
-        let n = socket.read(&mut buf).await?;
+        let n = stream.read(&mut buf).await?;
         if n == 0 {
             info!("Connection from {} closed", addr);
             return Ok(());
         }
 
-        //if !silent {
-        info!("Read from {}: {}", addr, std::str::from_utf8(&buf[0..n])?);
-        //}
+        if !silent {
+            info!("Read from {}: {}", addr, std::str::from_utf8(&buf[0..n])?);
+        }
 
-        socket.write_all(&buf[0..n]).await?;
+        stream.write_all(&buf[0..n]).await?;
     }
 }
 
@@ -30,9 +30,9 @@ pub async fn run(addr: impl AsRef<str>, silent: bool) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr.as_ref()).await?;
 
     loop {
-        let (socket, addr) = listener.accept().await?;
+        let (stream, addr) = listener.accept().await?;
         info!("New connection from {}", addr);
 
-        tokio::spawn(handle_connection(socket, addr, silent));
+        tokio::spawn(handle_connection(stream, addr, silent));
     }
 }
