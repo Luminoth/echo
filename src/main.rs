@@ -20,16 +20,18 @@ async fn main() -> anyhow::Result<()> {
     init_logging()?;
 
     let options: options::Options = argh::from_env();
-    let addr = "127.0.0.1:8080"; // TODO: from options
 
     let mut handles = Vec::new();
 
     if options.is_server() {
-        handles.push(tokio::spawn(server::run(addr, options.is_client())));
+        handles.push(tokio::spawn(server::run(
+            options.server_addr(),
+            options.is_client(),
+        )));
     }
 
     if options.is_client() {
-        handles.push(tokio::spawn(client::run(addr)));
+        handles.push(tokio::spawn(client::run(options.client_addr())));
     }
 
     let results = futures::future::join_all(handles).await;
