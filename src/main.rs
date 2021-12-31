@@ -35,8 +35,10 @@ async fn main() -> anyhow::Result<()> {
         )));
     }
 
-    if options.is_client() {
-        handles.push(tokio::spawn(client::run(options.client_addr())));
+    if options.is_connect() {
+        handles.push(tokio::spawn(client::run(options.connect_addr())));
+    } else if options.is_find() {
+        todo!();
     }
 
     let results = futures::future::join_all(handles).await;

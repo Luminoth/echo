@@ -4,8 +4,11 @@ use derive_more::Display;
 #[derive(FromArgs, PartialEq, Debug, Display)]
 #[argh(subcommand)]
 pub enum Mode {
-    #[display(fmt = "Client")]
-    Client(ClientCommand),
+    #[display(fmt = "Connect")]
+    Connect(ConnectCommand),
+
+    #[display(fmt = "Find")]
+    Find(FindCommand),
 
     #[display(fmt = "Server")]
     Server(ServerCommand),
@@ -14,10 +17,20 @@ pub enum Mode {
     Dedicated(DedicatedCommand),
 }
 
+impl Mode {
+    fn is_client(&self) -> bool {
+        matches!(self, Self::Connect(_) | Self::Find(_) | Self::Server(_))
+    }
+
+    fn is_server(&self) -> bool {
+        matches!(self, Self::Server(_) | Self::Dedicated(_))
+    }
+}
+
 #[derive(FromArgs, PartialEq, Debug)]
-/// Run as client
-#[argh(subcommand, name = "client")]
-pub struct ClientCommand {
+/// Connect client to a dedicated server
+#[argh(subcommand, name = "connect")]
+pub struct ConnectCommand {
     /// host to connect to
     #[argh(option, default = "default_host()")]
     pub host: String,
@@ -30,6 +43,11 @@ pub struct ClientCommand {
 fn default_host() -> String {
     "127.0.0.1".to_string()
 }
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Search for a server to connect to
+#[argh(subcommand, name = "find")]
+pub struct FindCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Run as combined client and server
@@ -66,20 +84,28 @@ pub struct Options {
 }
 
 impl Options {
-    pub fn is_client(&self) -> bool {
-        matches!(self.mode, Mode::Client(_)) || matches!(self.mode, Mode::Server(_))
+    pub fn is_connect(&self) -> bool {
+        matches!(self.mode, Mode::Connect(_)) || matches!(self.mode, Mode::Server(_))
     }
 
-    pub fn client_addr(&self) -> String {
+    pub fn is_find(&self) -> bool {
+        matches!(self.mode, Mode::Find(_))
+    }
+
+    pub fn is_client(&self) -> bool {
+        self.mode.is_client()
+    }
+
+    pub fn connect_addr(&self) -> String {
         match &self.mode {
-            Mode::Client(cmd) => format!("{}:{}", cmd.host, cmd.port),
+            Mode::Connect(cmd) => format!("{}:{}", cmd.host, cmd.port),
             Mode::Server(cmd) => format!("127.0.0.1:{}", cmd.port),
             _ => unreachable!(),
         }
     }
 
     pub fn is_server(&self) -> bool {
-        matches!(self.mode, Mode::Server(_)) || matches!(self.mode, Mode::Dedicated(_))
+        self.mode.is_server()
     }
 
     pub fn server_addr(&self) -> String {

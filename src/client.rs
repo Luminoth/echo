@@ -29,13 +29,17 @@ pub async fn run(addr: impl AsRef<str>) -> anyhow::Result<()> {
     let mut stdin = BufReader::new(stdin()).lines();
     loop {
         let event = tokio::select! {
-            line = stdin.next_line() => Event::Input(line?.unwrap()),
-            n = stream.read(&mut buf) => {
-                let n = n?;
-                if n == 0 {
-                    bail!("Server disconnected!");
+            line = stdin.next_line() => {
+                match line? {
+                    Some(line) => Event::Input(line),
+                    None => return Ok(()),
                 }
-                Event::Message(std::str::from_utf8(&buf[0..n])?.to_string())
+            },
+            n = stream.read(&mut buf) => {
+                match n? {
+                    0 => bail!("Server disconnected!"),
+                    n => Event::Message(std::str::from_utf8(&buf[0..n])?.to_string()),
+                }
             },
             else => bail!("Unhandled event!"),
         };

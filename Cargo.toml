@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 argh = "0.1"
+aws-sdk-config = "0.3"
+aws-sdk-gamelift = "0.3"
 console-subscriber = "0.1"
 derive_more = "0.99"
 futures = "0.3"
