@@ -28,13 +28,17 @@ async fn main() -> anyhow::Result<()> {
 
     let mut handles = Vec::new();
 
-    if options.is_server() {
+    // start server
+    if options.is_gamelift() {
+        todo!();
+    } else if options.is_server() {
         handles.push(tokio::spawn(server::run(
             options.server_addr(),
             options.is_client(),
         )));
     }
 
+    // start client
     if options.is_connect() {
         handles.push(tokio::spawn(client::connect(options.connect_addr())));
     } else if options.is_find() {

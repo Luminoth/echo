@@ -15,6 +15,9 @@ pub enum Mode {
 
     #[display(fmt = "Dedicated")]
     Dedicated(DedicatedCommand),
+
+    #[display(fmt = "GameLift")]
+    GameLift(GameLiftCommand),
 }
 
 impl Mode {
@@ -23,7 +26,10 @@ impl Mode {
     }
 
     fn is_server(&self) -> bool {
-        matches!(self, Self::Server(_) | Self::Dedicated(_))
+        matches!(
+            self,
+            Self::Server(_) | Self::Dedicated(_) | Self::GameLift(_)
+        )
     }
 }
 
@@ -71,6 +77,11 @@ fn default_port() -> u16 {
     8065
 }
 
+#[derive(FromArgs, PartialEq, Debug)]
+/// Run as dedicated server on AWS GameLift
+#[argh(subcommand, name = "gamelift")]
+pub struct GameLiftCommand {}
+
 /// Echo client / server
 #[derive(FromArgs, Debug)]
 pub struct Options {
@@ -106,6 +117,10 @@ impl Options {
 
     pub fn is_server(&self) -> bool {
         self.mode.is_server()
+    }
+
+    pub fn is_gamelift(&self) -> bool {
+        matches!(self.mode, Mode::GameLift(_))
     }
 
     pub fn server_addr(&self) -> String {
