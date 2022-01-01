@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::mpsc,
+    sync::broadcast,
 };
 use tracing::info;
 
@@ -31,7 +31,7 @@ async fn handle_connection(
 pub async fn run(
     addr: impl AsRef<str>,
     silent: bool,
-    mut shutdown: mpsc::UnboundedReceiver<bool>,
+    mut shutdown: broadcast::Receiver<bool>,
 ) -> anyhow::Result<()> {
     info!("Listening on {}", addr.as_ref());
     let listener = TcpListener::bind(addr.as_ref()).await?;

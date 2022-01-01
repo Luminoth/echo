@@ -1,8 +1,9 @@
 mod client;
+mod gamelift;
 mod options;
 mod server;
 
-use tokio::sync::mpsc;
+use tokio::sync::broadcast;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -27,35 +28,34 @@ async fn main() -> anyhow::Result<()> {
         init_logging()?;
     }
 
-    let (shutdown_sender, shutdown_receiver) = mpsc::unbounded_channel();
+    let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
-    // start server
-    let server_handle = if options.is_gamelift() {
-        todo!();
-    } else if options.is_server() {
-        Some(tokio::spawn(server::run(
-            options.server_addr(),
-            options.is_client(),
-            shutdown_receiver,
-        )))
+    match options.mode {
+        options::Mode::Connect(_) => {
+            client::connect(options.connect_addr()).await?;
+        }
+        options::Mode::Find(_) => {
+            client::find().await?;
+        }
+        options::Mode::Server(_) => {
+            let server_handle =
+                tokio::spawn(server::run(options.server_addr(), true, shutdown_receiver));
 
-        // TODO: server mode needs to wait for the listener to start before trying to connect
-    } else {
-        None
+            // TODO: need to wait for the server listener before starting the client
+
+            client::connect(options.connect_addr()).await?;
+
+            shutdown_sender.send(true)?;
+
+            server_handle.await??;
+        }
+        options::Mode::Dedicated(_) => {
+            server::run(options.server_addr(), false, shutdown_receiver).await?;
+        }
+        options::Mode::GameLift(cmd) => {
+            gamelift::run(cmd.port).await?;
+        }
     };
-
-    // start client
-    if options.is_connect() {
-        client::connect(options.connect_addr()).await?;
-        shutdown_sender.send(true)?;
-    } else if options.is_find() {
-        client::find().await?;
-        shutdown_sender.send(true)?;
-    }
-
-    if let Some(server_handle) = server_handle {
-        server_handle.await??;
-    }
 
     Ok(())
 }

@@ -10,6 +10,7 @@ anyhow = "1.0"
 argh = "0.1"
 aws-config = "0.3"
 aws-sdk-gamelift = "0.3"
+aws-gamelift-server-sdk-rs = { git = "https://github.com/ZaMaZaN4iK/aws-gamelift-server-sdk-rs" }
 console-subscriber = "0.1"
 derive_more = "0.99"
 futures = "0.3"

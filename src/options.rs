@@ -20,19 +20,6 @@ pub enum Mode {
     GameLift(GameLiftCommand),
 }
 
-impl Mode {
-    fn is_client(&self) -> bool {
-        matches!(self, Self::Connect(_) | Self::Find(_) | Self::Server(_))
-    }
-
-    fn is_server(&self) -> bool {
-        matches!(
-            self,
-            Self::Server(_) | Self::Dedicated(_) | Self::GameLift(_)
-        )
-    }
-}
-
 #[derive(FromArgs, PartialEq, Debug)]
 /// Connect client to a dedicated server
 #[argh(subcommand, name = "connect")]
@@ -73,14 +60,18 @@ pub struct DedicatedCommand {
     pub port: u16,
 }
 
-fn default_port() -> u16 {
-    8065
-}
-
 #[derive(FromArgs, PartialEq, Debug)]
 /// Run as dedicated server on AWS GameLift
 #[argh(subcommand, name = "gamelift")]
-pub struct GameLiftCommand {}
+pub struct GameLiftCommand {
+    /// port to connect to
+    #[argh(option, default = "default_port()")]
+    pub port: u16,
+}
+
+fn default_port() -> u16 {
+    8065
+}
 
 /// Echo client / server
 #[derive(FromArgs, Debug)]
@@ -95,32 +86,12 @@ pub struct Options {
 }
 
 impl Options {
-    pub fn is_connect(&self) -> bool {
-        matches!(self.mode, Mode::Connect(_)) || matches!(self.mode, Mode::Server(_))
-    }
-
-    pub fn is_find(&self) -> bool {
-        matches!(self.mode, Mode::Find(_))
-    }
-
-    pub fn is_client(&self) -> bool {
-        self.mode.is_client()
-    }
-
     pub fn connect_addr(&self) -> String {
         match &self.mode {
             Mode::Connect(cmd) => format!("{}:{}", cmd.host, cmd.port),
             Mode::Server(cmd) => format!("127.0.0.1:{}", cmd.port),
             _ => unreachable!(),
         }
-    }
-
-    pub fn is_server(&self) -> bool {
-        self.mode.is_server()
-    }
-
-    pub fn is_gamelift(&self) -> bool {
-        matches!(self.mode, Mode::GameLift(_))
     }
 
     pub fn server_addr(&self) -> String {
