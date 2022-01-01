@@ -1,7 +1,10 @@
 use std::net::SocketAddr;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+    sync::mpsc,
+};
 use tracing::info;
 
 async fn handle_connection(
@@ -25,14 +28,26 @@ async fn handle_connection(
     }
 }
 
-pub async fn run(addr: impl AsRef<str>, silent: bool) -> anyhow::Result<()> {
+pub async fn run(
+    addr: impl AsRef<str>,
+    silent: bool,
+    mut shutdown: mpsc::UnboundedReceiver<bool>,
+) -> anyhow::Result<()> {
     info!("Listening on {}", addr.as_ref());
     let listener = TcpListener::bind(addr.as_ref()).await?;
 
     loop {
-        let (stream, addr) = listener.accept().await?;
-        info!("New connection from {}", addr);
+        tokio::select! {
+            res = listener.accept() => {
+                let (stream, addr) = res?;
 
-        tokio::spawn(handle_connection(stream, addr, silent));
+                info!("New connection from {}", addr);
+                tokio::spawn(handle_connection(stream, addr, silent));
+            },
+            _ = shutdown.recv() => {
+                info!("Received shutdown, exiting ...");
+                return Ok(());
+            }
+        }
     }
 }

@@ -2,7 +2,8 @@ mod client;
 mod options;
 mod server;
 
-use tracing::{error, Level};
+use tokio::sync::mpsc;
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 fn init_logging() -> anyhow::Result<()> {
@@ -26,41 +27,34 @@ async fn main() -> anyhow::Result<()> {
         init_logging()?;
     }
 
-    let mut handles = Vec::new();
+    let (shutdown_sender, shutdown_receiver) = mpsc::unbounded_channel();
 
     // start server
-    if options.is_gamelift() {
+    let server_handle = if options.is_gamelift() {
         todo!();
     } else if options.is_server() {
-        handles.push(tokio::spawn(server::run(
+        Some(tokio::spawn(server::run(
             options.server_addr(),
             options.is_client(),
-        )));
-    }
+            shutdown_receiver,
+        )))
+
+        // TODO: server mode needs to wait for the listener to start before trying to connect
+    } else {
+        None
+    };
 
     // start client
     if options.is_connect() {
-        handles.push(tokio::spawn(client::connect(options.connect_addr())));
+        client::connect(options.connect_addr()).await?;
+        shutdown_sender.send(true)?;
     } else if options.is_find() {
-        handles.push(tokio::spawn(client::find()));
+        client::find().await?;
+        shutdown_sender.send(true)?;
     }
 
-    let results = futures::future::join_all(handles).await;
-    for result in results {
-        match result {
-            Ok(result) => {
-                if let Err(err) = result {
-                    error!("Error: {}", err);
-                }
-            }
-            Err(err) => error!("Error: {}", err),
-        }
-    }
-
-    // stdin polling will block the client exiting
-    // so just force it for now
-    if options.is_client() {
-        std::process::exit(1);
+    if let Some(server_handle) = server_handle {
+        server_handle.await??;
     }
 
     Ok(())

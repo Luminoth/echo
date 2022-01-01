@@ -1,8 +1,12 @@
 use anyhow::bail;
-use aws_sdk_gamelift::model::{AttributeValue, Player};
-use aws_sdk_gamelift::Client;
-use tokio::io::{stdin, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpStream;
+use aws_sdk_gamelift::{
+    model::{AttributeValue, Player},
+    Client,
+};
+use tokio::{
+    io::{stdin, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::TcpStream,
+};
 use tracing::info;
 use uuid::Uuid;
 
