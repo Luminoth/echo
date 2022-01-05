@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::broadcast,
+    sync::watch,
 };
 use tracing::info;
 
@@ -31,10 +31,13 @@ async fn handle_connection(
 pub async fn run(
     addr: impl AsRef<str>,
     silent: bool,
-    mut shutdown: broadcast::Receiver<bool>,
+    ready: watch::Sender<bool>,
+    mut shutdown: watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
     info!("Listening on {}", addr.as_ref());
     let listener = TcpListener::bind(addr.as_ref()).await?;
+
+    ready.send(true)?;
 
     loop {
         tokio::select! {
@@ -44,9 +47,12 @@ pub async fn run(
                 info!("New connection from {}", addr);
                 tokio::spawn(handle_connection(stream, addr, silent));
             },
-            _ = shutdown.recv() => {
-                info!("Received shutdown, exiting ...");
-                return Ok(());
+            _ = shutdown.changed() => {
+                let shutdown = shutdown.borrow();
+                if *shutdown {
+                    info!("Received shutdown, exiting ...");
+                    return Ok(());
+                }
             }
         }
     }

@@ -2,8 +2,9 @@ mod client;
 mod gamelift;
 mod options;
 mod server;
+mod util;
 
-use tokio::sync::broadcast;
+use tokio::sync::watch;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -28,7 +29,8 @@ async fn main() -> anyhow::Result<()> {
         init_logging()?;
     }
 
-    let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
+    let (ready_sender, ready_receiver) = watch::channel(false);
+    let (shutdown_sender, shutdown_receiver) = watch::channel(false);
 
     match options.mode {
         options::Mode::Connect(_) => {
@@ -38,11 +40,18 @@ async fn main() -> anyhow::Result<()> {
             client::find().await?;
         }
         options::Mode::Server(_) => {
-            let server_handle =
-                tokio::spawn(server::run(options.server_addr(), true, shutdown_receiver));
+            // spawn the server process
+            let server_handle = tokio::spawn(server::run(
+                options.server_addr(),
+                true,
+                ready_sender,
+                shutdown_receiver,
+            ));
 
-            // TODO: need to wait for the server listener before starting the client
+            // wait for the server to be ready
+            util::wait_for_signal(ready_receiver).await?;
 
+            // run the client
             client::connect(options.connect_addr()).await?;
 
             shutdown_sender.send(true)?;
@@ -50,7 +59,13 @@ async fn main() -> anyhow::Result<()> {
             server_handle.await??;
         }
         options::Mode::Dedicated(_) => {
-            server::run(options.server_addr(), false, shutdown_receiver).await?;
+            server::run(
+                options.server_addr(),
+                false,
+                ready_sender,
+                shutdown_receiver,
+            )
+            .await?;
         }
         options::Mode::GameLift(cmd) => {
             gamelift::run(cmd.port).await?;
