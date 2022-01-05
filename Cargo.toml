@@ -13,7 +13,6 @@ aws-sdk-gamelift = "0.3"
 aws-gamelift-server-sdk-rs = { git = "https://github.com/ZaMaZaN4iK/aws-gamelift-server-sdk-rs" }
 console-subscriber = "0.1"
 derive_more = "0.99"
-futures = "0.3"
 tokio = { version = "1.15", features = ["full", "tracing"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
