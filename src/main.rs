@@ -46,6 +46,7 @@ async fn main() -> anyhow::Result<()> {
                 true,
                 ready_sender,
                 shutdown_receiver,
+                server::ServerCallbacks::default(),
             ));
 
             // wait for the server to be ready
@@ -64,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
                 false,
                 ready_sender,
                 shutdown_receiver,
+                server::ServerCallbacks::default(),
             )
             .await?;
         }

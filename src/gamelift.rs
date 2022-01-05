@@ -29,6 +29,39 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                         game_session.game_session_id
                     );
 
+                    let callbacks = server::ServerCallbacks {
+                        accept_player_session: Box::new({
+                            let api = api.clone();
+                            move |player_session_id| {
+                                tokio::spawn({
+                                    let api = api.clone();
+                                    async move {
+                                        api.write()
+                                            .await
+                                            .accept_player_session(player_session_id)
+                                            .await
+                                            .expect("Invalid player session for accept!");
+                                    }
+                                });
+                            }
+                        }),
+                        remove_player_session: Box::new({
+                            let api = api.clone();
+                            move |player_session_id| {
+                                tokio::spawn({
+                                    let api = api.clone();
+                                    async move {
+                                        api.write()
+                                            .await
+                                            .remove_player_session(player_session_id)
+                                            .await
+                                            .expect("Invalid player session for remove!");
+                                    }
+                                });
+                            }
+                        }),
+                    };
+
                     // spawn the server process
                     let (ready_sender, ready_receiver) = watch::channel(false);
                     tokio::spawn(server::run(
@@ -36,6 +69,7 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                         false,
                         ready_sender,
                         shutdown_receiver.clone(),
+                        callbacks,
                     ));
 
                     tokio::spawn({
@@ -50,7 +84,12 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                     });
                 }
             }),
-            on_update_game_session: Box::new(|_update_game_session| warn!("update game session")),
+            on_update_game_session: Box::new(|update_game_session| {
+                warn!(
+                    "Update game session: {:?}",
+                    update_game_session.backfill_ticket_id
+                )
+            }),
             on_process_terminate: Box::new(move || {
                 info!("Process terminating ...");
 

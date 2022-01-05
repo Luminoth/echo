@@ -28,9 +28,16 @@ async fn handle_event(event: Event, stream: &mut TcpStream) -> anyhow::Result<()
 }
 
 pub async fn connect(addr: impl AsRef<str>) -> anyhow::Result<()> {
-    info!("Connecting to {} ...", addr.as_ref());
+    let player_session_id = Uuid::new_v4();
+
+    info!("{} connecting to {} ...", player_session_id, addr.as_ref());
     let mut stream = TcpStream::connect(addr.as_ref()).await?;
     info!("Success!");
+
+    // first thing we send is our player session id
+    stream
+        .write_all(player_session_id.to_string().as_bytes())
+        .await?;
 
     let mut buf = [0; 1024];
     let mut stdin = BufReader::new(stdin()).lines();
@@ -60,7 +67,7 @@ pub async fn find() -> anyhow::Result<()> {
 
     let shared_config = aws_config::from_env().load().await;
 
-    let player_id = Uuid::new_v4();
+    let player_session_id = Uuid::new_v4();
 
     let client = Client::new(&shared_config);
     let output = client
@@ -68,7 +75,7 @@ pub async fn find() -> anyhow::Result<()> {
         .configuration_name("echo")
         .players(
             Player::builder()
-                .player_id(player_id.to_string())
+                .player_id(player_session_id.to_string())
                 .player_attributes("skill", AttributeValue::builder().n(0.0).build())
                 .build(),
         )
