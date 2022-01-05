@@ -24,10 +24,7 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
             on_start_game_session: Box::new({
                 let api = api.clone();
                 move |game_session| {
-                    info!(
-                        "Starting game session {:?} ...",
-                        game_session.game_session_id
-                    );
+                    info!("Starting game session: {:?}", game_session);
 
                     let callbacks = server::ServerCallbacks {
                         accept_player_session: Box::new({
@@ -85,10 +82,7 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                 }
             }),
             on_update_game_session: Box::new(|update_game_session| {
-                warn!(
-                    "Update game session: {:?}",
-                    update_game_session.backfill_ticket_id
-                )
+                warn!("Update game session: {:?}", update_game_session)
             }),
             on_process_terminate: Box::new(move || {
                 info!("Process terminating ...");
