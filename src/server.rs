@@ -1,7 +1,10 @@
+use std::future;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::bail;
+use futures_util::FutureExt;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -9,16 +12,22 @@ use tokio::{
 };
 use tracing::info;
 
+type AcceptPlayerSessionOutput = Pin<Box<dyn future::Future<Output = ()> + Send>>;
+type AcceptPlayerSession = Box<dyn Fn(String) -> AcceptPlayerSessionOutput + Send + Sync>;
+
+type RemovePlayerSessionOutput = Pin<Box<dyn future::Future<Output = ()> + Send>>;
+type RemovePlayerSession = Box<dyn Fn(String) -> RemovePlayerSessionOutput + Send + Sync>;
+
 pub struct ServerCallbacks {
-    pub accept_player_session: Box<dyn Fn(String) + Send + Sync>,
-    pub remove_player_session: Box<dyn Fn(String) + Send + Sync>,
+    pub accept_player_session: AcceptPlayerSession,
+    pub remove_player_session: RemovePlayerSession,
 }
 
 impl Default for ServerCallbacks {
     fn default() -> Self {
         Self {
-            accept_player_session: Box::new(|_| ()),
-            remove_player_session: Box::new(|_| ()),
+            accept_player_session: Box::new(|_| future::ready(()).boxed()),
+            remove_player_session: Box::new(|_| future::ready(()).boxed()),
         }
     }
 }
@@ -54,7 +63,7 @@ async fn handle_connection(
     };
 
     info!("Accepted player {}", player_session_id);
-    (callbacks.write().await.accept_player_session)(player_session_id);
+    (callbacks.write().await.accept_player_session)(player_session_id).await;
 
     let mut buf = [0; 1024];
     loop {
