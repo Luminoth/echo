@@ -1,8 +1,10 @@
 #! /bin/bash
 
+set -e
+
 VERSION=`git rev-parse --short HEAD`
 
-rm -f package*.zip
+rm -f echo*.zip
 
 mkdir build
 
@@ -12,7 +14,7 @@ cargo install --path . --root build/
 rm build/.crates*
 
 cd build
-zip -r ../package-$VERSION.zip .
+zip -r ../echo-$VERSION.zip .
 
 cd ..
 rm -rf build
