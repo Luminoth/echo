@@ -1,3 +1,4 @@
 /target
 /logs
 echo*.zip
+*.pem
