@@ -5,17 +5,21 @@ mod server;
 mod util;
 
 use tokio::sync::watch;
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{filter, prelude::*};
 
-fn init_logging() -> anyhow::Result<()> {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
+fn init_logging() -> anyhow::Result<tracing_appender::non_blocking::WorkerGuard> {
+    let file_appender = tracing_appender::rolling::daily("logs", "echo.log");
+    let (non_blocking_appender, guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing::subscriber::set_global_default(subscriber)?;
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .and_then(tracing_subscriber::fmt::layer().with_writer(non_blocking_appender))
+                .with_filter(filter::LevelFilter::INFO),
+        )
+        .init();
 
-    Ok(())
+    Ok(guard)
 }
 
 #[tokio::main]
@@ -23,11 +27,12 @@ async fn main() -> anyhow::Result<()> {
     let options: options::Options = argh::from_env();
 
     // TODO: make this not mutually exclusive
-    if options.tracing {
+    let _guard = if options.tracing {
         console_subscriber::init();
+        None
     } else {
-        init_logging()?;
-    }
+        Some(init_logging()?)
+    };
 
     let (ready_sender, ready_receiver) = watch::channel(false);
     let (shutdown_sender, shutdown_receiver) = watch::channel(false);
