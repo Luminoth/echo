@@ -63,13 +63,19 @@ async fn handle_connection(
     };
 
     info!("Accepted player {}", player_session_id);
-    (callbacks.write().await.accept_player_session)(player_session_id).await;
+    (callbacks.write().await.accept_player_session)(player_session_id.clone()).await;
+
+    info!("running");
 
     let mut buf = [0; 1024];
     loop {
         let n = stream.read(&mut buf).await?;
         if n == 0 {
             info!("Connection from {} closed", addr);
+
+            (callbacks.write().await.remove_player_session)(player_session_id.clone()).await;
+            info!("Removed player {}", player_session_id);
+
             return Ok(());
         }
 

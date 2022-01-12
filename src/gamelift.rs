@@ -34,11 +34,14 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                             move |player_session_id| {
                                 let api = api.clone();
                                 async move {
-                                    api.write()
-                                        .await
-                                        .accept_player_session(player_session_id)
-                                        .await
-                                        .expect("Invalid player session for accept!");
+                                    // TODO: have to spawn to get around the internal SDK lock being held
+                                    tokio::spawn(async move {
+                                        api.write()
+                                            .await
+                                            .accept_player_session(player_session_id)
+                                            .await
+                                            .expect("Invalid player session for accept!");
+                                    });
                                 }
                                 .boxed()
                             }
@@ -48,11 +51,14 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                             move |player_session_id| {
                                 let api = api.clone();
                                 async move {
-                                    api.write()
-                                        .await
-                                        .remove_player_session(player_session_id)
-                                        .await
-                                        .expect("Invalid player session for remove!");
+                                    // TODO: have to spawn to get around the internal SDK lock being held
+                                    tokio::spawn(async move {
+                                        api.write()
+                                            .await
+                                            .remove_player_session(player_session_id)
+                                            .await
+                                            .expect("Invalid player session for remove!");
+                                    });
                                 }
                                 .boxed()
                             }
@@ -71,15 +77,19 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
 
                     let api = api.clone();
                     async move {
-                        info!("Waiting for ready ...");
-
-                        // wait for the server to be ready
-                        util::wait_for_signal(ready_receiver).await.unwrap();
-
                         // update gamelift
-                        api.write().await.activate_game_session().await.unwrap();
+                        // TODO: have to spawn to get around the internal SDK lock being held
+                        tokio::spawn(async move {
+                            info!("Waiting for ready ...");
 
-                        info!("Ready!");
+                            // wait for the server to be ready
+                            util::wait_for_signal(ready_receiver).await.unwrap();
+
+                            let mut api = api.write().await;
+                            api.activate_game_session().await.unwrap();
+
+                            info!("Ready!");
+                        });
                     }
                     .boxed()
                 }
