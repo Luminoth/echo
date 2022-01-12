@@ -4,7 +4,11 @@ mod options;
 mod server;
 mod util;
 
-use tokio::sync::watch;
+use std::sync::Arc;
+
+use futures_util::FutureExt;
+use tokio::sync::{watch, Mutex};
+use tracing::info;
 use tracing_subscriber::{filter, prelude::*};
 
 fn init_logging() -> anyhow::Result<tracing_appender::non_blocking::WorkerGuard> {
@@ -34,7 +38,6 @@ async fn main() -> anyhow::Result<()> {
         Some(init_logging()?)
     };
 
-    let (ready_sender, ready_receiver) = watch::channel(false);
     let (shutdown_sender, shutdown_receiver) = watch::channel(false);
 
     match options.mode {
@@ -45,14 +48,31 @@ async fn main() -> anyhow::Result<()> {
             client::find().await?;
         }
         options::Mode::Server(_) => {
+            let (ready_sender, ready_receiver) = watch::channel(false);
+            let ready_sender = Arc::new(Mutex::new(ready_sender));
+
             // spawn the server process
             let server_handle = tokio::spawn(server::run(
                 options.server_addr(),
                 true,
-                ready_sender,
                 shutdown_receiver,
-                server::ServerCallbacks::default(),
+                server::ServerCallbacks {
+                    begin_session: Box::new({
+                        let ready_sender = ready_sender.clone();
+                        move || {
+                            let ready_sender = ready_sender.clone();
+                            async move {
+                                ready_sender.lock().await.send(true).unwrap();
+                            }
+                            .boxed()
+                        }
+                    }),
+                    ..Default::default()
+                },
+                None,
             ));
+
+            info!("Waiting for ready ...");
 
             // wait for the server to be ready
             util::wait_for_signal(ready_receiver).await?;
@@ -68,9 +88,9 @@ async fn main() -> anyhow::Result<()> {
             server::run(
                 options.server_addr(),
                 false,
-                ready_sender,
                 shutdown_receiver,
                 server::ServerCallbacks::default(),
+                None,
             )
             .await?;
         }

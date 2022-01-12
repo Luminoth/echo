@@ -6,10 +6,9 @@ use aws_gamelift_server_sdk_rs::{
 };
 use futures_util::FutureExt;
 use tokio::sync::{mpsc, watch, RwLock};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::server;
-use crate::util;
 
 pub async fn run(port: u16) -> anyhow::Result<()> {
     let mut api = aws_gamelift_server_sdk_rs::api::Api::default();
@@ -29,6 +28,32 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                     info!("Starting game session: {:?}", game_session);
 
                     let callbacks = server::ServerCallbacks {
+                        begin_session: Box::new({
+                            let api = api.clone();
+                            move || {
+                                let api = api.clone();
+                                async move {
+                                    if let Err(err) =
+                                        api.write().await.activate_game_session().await
+                                    {
+                                        error!("Failed to begin session: {}", err);
+                                    }
+                                }
+                                .boxed()
+                            }
+                        }),
+                        end_session: Box::new({
+                            let api = api.clone();
+                            move || {
+                                let api = api.clone();
+                                async move {
+                                    if let Err(err) = api.write().await.process_ending().await {
+                                        error!("Failed to end session: {}", err);
+                                    }
+                                }
+                                .boxed()
+                            }
+                        }),
                         accept_player_session: Box::new({
                             let api = api.clone();
                             move |player_session_id| {
@@ -36,11 +61,14 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                                 async move {
                                     // TODO: have to spawn to get around the internal SDK lock being held
                                     tokio::spawn(async move {
-                                        api.write()
+                                        if let Err(err) = api
+                                            .write()
                                             .await
                                             .accept_player_session(player_session_id)
                                             .await
-                                            .expect("Invalid player session for accept!");
+                                        {
+                                            error!("Player session accept error: {}", err);
+                                        }
                                     });
                                 }
                                 .boxed()
@@ -53,11 +81,14 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                                 async move {
                                     // TODO: have to spawn to get around the internal SDK lock being held
                                     tokio::spawn(async move {
-                                        api.write()
+                                        if let Err(err) = api
+                                            .write()
                                             .await
                                             .remove_player_session(player_session_id)
                                             .await
-                                            .expect("Invalid player session for remove!");
+                                        {
+                                            error!("Player session remove error: {}", err);
+                                        }
                                     });
                                 }
                                 .boxed()
@@ -66,32 +97,17 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                     };
 
                     // spawn the server process
-                    let (ready_sender, ready_receiver) = watch::channel(false);
                     tokio::spawn(server::run(
                         format!("0.0.0.0:{}", port),
                         false,
-                        ready_sender,
                         shutdown_receiver.clone(),
                         callbacks,
+                        Some(60),
                     ));
 
-                    let api = api.clone();
-                    async move {
-                        // update gamelift
-                        // TODO: have to spawn to get around the internal SDK lock being held
-                        tokio::spawn(async move {
-                            info!("Waiting for ready ...");
+                    info!("Waiting for session ...");
 
-                            // wait for the server to be ready
-                            util::wait_for_signal(ready_receiver).await.unwrap();
-
-                            let mut api = api.write().await;
-                            api.activate_game_session().await.unwrap();
-
-                            info!("Ready!");
-                        });
-                    }
-                    .boxed()
+                    future::ready(()).boxed()
                 }
             }),
             on_update_game_session: Box::new(|update_game_session| {

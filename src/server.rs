@@ -12,6 +12,12 @@ use tokio::{
 };
 use tracing::info;
 
+type BeginSessionOutput = Pin<Box<dyn future::Future<Output = ()> + Send>>;
+type BeginSession = Box<dyn Fn() -> BeginSessionOutput + Send + Sync>;
+
+type EndSessionOutput = Pin<Box<dyn future::Future<Output = ()> + Send>>;
+type EndSession = Box<dyn Fn() -> EndSessionOutput + Send + Sync>;
+
 type AcceptPlayerSessionOutput = Pin<Box<dyn future::Future<Output = ()> + Send>>;
 type AcceptPlayerSession = Box<dyn Fn(String) -> AcceptPlayerSessionOutput + Send + Sync>;
 
@@ -19,6 +25,9 @@ type RemovePlayerSessionOutput = Pin<Box<dyn future::Future<Output = ()> + Send>
 type RemovePlayerSession = Box<dyn Fn(String) -> RemovePlayerSessionOutput + Send + Sync>;
 
 pub struct ServerCallbacks {
+    pub begin_session: BeginSession,
+    pub end_session: EndSession,
+
     pub accept_player_session: AcceptPlayerSession,
     pub remove_player_session: RemovePlayerSession,
 }
@@ -26,6 +35,8 @@ pub struct ServerCallbacks {
 impl Default for ServerCallbacks {
     fn default() -> Self {
         Self {
+            begin_session: Box::new(|| future::ready(()).boxed()),
+            end_session: Box::new(|| future::ready(()).boxed()),
             accept_player_session: Box::new(|_| future::ready(()).boxed()),
             remove_player_session: Box::new(|_| future::ready(()).boxed()),
         }
@@ -65,8 +76,6 @@ async fn handle_connection(
     info!("Accepted player {}", player_session_id);
     (callbacks.write().await.accept_player_session)(player_session_id.clone()).await;
 
-    info!("running");
-
     let mut buf = [0; 1024];
     loop {
         let n = stream.read(&mut buf).await?;
@@ -90,16 +99,17 @@ async fn handle_connection(
 pub async fn run(
     addr: impl AsRef<str>,
     silent: bool,
-    ready: watch::Sender<bool>,
     mut shutdown: watch::Receiver<bool>,
     callbacks: ServerCallbacks,
+    _timeout: Option<u64>,
 ) -> anyhow::Result<()> {
     let callbacks = Arc::new(RwLock::new(callbacks));
 
     info!("Listening on {}", addr.as_ref());
     let listener = TcpListener::bind(addr.as_ref()).await?;
 
-    ready.send(true)?;
+    info!("Starting session");
+    (callbacks.write().await.begin_session)().await;
 
     loop {
         tokio::select! {
@@ -110,6 +120,7 @@ pub async fn run(
                 tokio::spawn(handle_connection(stream, addr, silent, callbacks.clone()));
 
             },
+            // TODO: on a timer, check if we have no players and have timed out
             _ = shutdown.changed() => {
                 let shutdown = shutdown.borrow();
                 if *shutdown {

@@ -9,5 +9,6 @@
         * Can override the port here if necessary, defaults to 8080
     * aws gamelift describe-game-sessions --endpoint-url http://localhost:8080 --fleet-id fleet-123
     * aws gamelift create-game-session --endpoint-url http://localhost:8080 --maximum-player-session-count 2 --fleet-id fleet-123
+    * aws gamelift describe-instances --endpoint-url http://localhost:8080 --fleet-id fleet-123
 * Requires musl target for building packages
   * Requires musl-tools to be installed
