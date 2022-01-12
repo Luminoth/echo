@@ -71,11 +71,15 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
 
                     let api = api.clone();
                     async move {
+                        info!("Waiting for ready ...");
+
                         // wait for the server to be ready
                         util::wait_for_signal(ready_receiver).await.unwrap();
 
                         // update gamelift
                         api.write().await.activate_game_session().await.unwrap();
+
+                        info!("Ready!");
                     }
                     .boxed()
                 }
@@ -93,7 +97,13 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
 
                 future::ready(()).boxed()
             }),
-            on_health_check: Box::new(|| async move { true }.boxed()),
+            on_health_check: Box::new(|| {
+                async move {
+                    info!("health check");
+                    true
+                }
+                .boxed()
+            }),
             port: port as i32,
             log_parameters: LogParameters {
                 log_paths: vec!["logs".to_string()],

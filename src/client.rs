@@ -1,6 +1,6 @@
 use anyhow::bail;
 use aws_sdk_gamelift::{
-    model::{AttributeValue, Player},
+    model::{MatchmakingConfigurationStatus, MatchmakingTicket, Player},
     Client,
 };
 use tokio::{
@@ -62,6 +62,15 @@ pub async fn connect(addr: impl AsRef<str>) -> anyhow::Result<()> {
     }
 }
 
+fn print_ticket(ticket: &MatchmakingTicket) {
+    info!("Ticket ID: {:?}", ticket.ticket_id);
+    info!(
+        "Status: {:?} (reason: {:?}) - {:?}",
+        ticket.status, ticket.status_reason, ticket.status_message
+    );
+    info!("Estimated wait: {:?}", ticket.estimated_wait_time);
+}
+
 pub async fn find() -> anyhow::Result<()> {
     info!("Searching for server ...");
 
@@ -76,19 +85,54 @@ pub async fn find() -> anyhow::Result<()> {
         .players(
             Player::builder()
                 .player_id(player_session_id.to_string())
-                .player_attributes("skill", AttributeValue::builder().n(0.0).build())
                 .build(),
         )
         .send()
         .await?;
 
-    let ticket = output.matchmaking_ticket.unwrap();
-    info!("Ticket ID: {:?}", ticket.ticket_id);
-    info!(
-        "Status: {:?} (reason: {:?}) - {:?}",
-        ticket.status, ticket.status_reason, ticket.status_message
-    );
-    info!("Estimated wait: {:?}", ticket.estimated_wait_time);
+    let mut ticket = output.matchmaking_ticket.unwrap();
+    print_ticket(&ticket);
+
+    let connect_addr;
+
+    let ticket_id = ticket.ticket_id.unwrap();
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+        let output = client
+            .describe_matchmaking()
+            .ticket_ids(ticket_id.clone())
+            .send()
+            .await?;
+
+        ticket = output.ticket_list.unwrap().first().unwrap().clone();
+
+        let status = ticket.status.as_ref().unwrap();
+        match status {
+            MatchmakingConfigurationStatus::Cancelled
+            | MatchmakingConfigurationStatus::Failed
+            | MatchmakingConfigurationStatus::TimedOut
+            | MatchmakingConfigurationStatus::Unknown(_) => {
+                bail!("Find failed: {:?}", status);
+            }
+            MatchmakingConfigurationStatus::Queued
+            | MatchmakingConfigurationStatus::Searching
+            | MatchmakingConfigurationStatus::Placing => print_ticket(&ticket),
+            MatchmakingConfigurationStatus::Completed => {
+                let connection_info = ticket.game_session_connection_info.as_ref().unwrap();
+                connect_addr = Some(format!(
+                    "{}:{}",
+                    connection_info.ip_address.as_ref().unwrap(),
+                    connection_info.port.unwrap()
+                ));
+                break;
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    info!("Found a match!");
+    connect(connect_addr.unwrap()).await?;
 
     Ok(())
 }
