@@ -65,10 +65,12 @@ impl ServerState {
 }
 
 async fn read_player_session_id(stream: &mut TcpStream) -> anyhow::Result<String> {
-    let mut buf = [0; 36];
+    let len = stream.read_u8().await? as usize;
+
+    let mut buf = vec![0; len];
 
     let mut t = 0;
-    while t < 36 {
+    while t < len {
         let n = stream.read(&mut buf[t..]).await?;
         if n == 0 {
             bail!("Connection closed!");
@@ -86,15 +88,18 @@ async fn handle_connection(
     silent: bool,
     state: Arc<RwLock<ServerState>>,
 ) -> anyhow::Result<()> {
+    // TODO: read player id from stream
+    let player_id = "N/A";
+
     let player_session_id = match read_player_session_id(&mut stream).await {
         Ok(player_session_id) => player_session_id,
-        Err(_) => {
-            info!("Connection from {} closed", addr);
+        Err(err) => {
+            info!("Connection from {} error: {}", addr, err);
             return Ok(());
         }
     };
 
-    info!("Accepted player {}", player_session_id);
+    info!("Accepted player {} ({})", player_id, player_session_id);
     {
         let mut state = state.write().await;
         (state.callbacks.accept_player_session)(player_session_id.clone()).await;
@@ -116,7 +121,7 @@ async fn handle_connection(
                 state.player_count -= 1;
                 state.last_update_time = Utc::now().timestamp();
             }
-            info!("Removed player {}", player_session_id);
+            info!("Removed player {} ({})", player_id, player_session_id);
 
             return Ok(());
         }
@@ -146,7 +151,7 @@ pub async fn run(
     info!("Listening on {}", addr.as_ref());
     let listener = TcpListener::bind(addr.as_ref()).await?;
 
-    info!("Starting session");
+    info!("Starting session ...");
     (state.read().await.callbacks.begin_session)().await;
 
     loop {

@@ -10,6 +10,7 @@ use futures_util::FutureExt;
 use tokio::sync::{watch, Mutex};
 use tracing::info;
 use tracing_subscriber::{filter, prelude::*};
+use uuid::Uuid;
 
 fn init_logging() -> anyhow::Result<tracing_appender::non_blocking::WorkerGuard> {
     let file_appender = tracing_appender::rolling::daily("logs", "echo.log");
@@ -42,7 +43,10 @@ async fn main() -> anyhow::Result<()> {
 
     match options.mode {
         options::Mode::Connect(_) => {
-            client::connect(options.connect_addr()).await?;
+            // TODO: allow optional CLI arg for the player id and player session id
+            // so that GameLift local testing can function correctly
+            let player_id = Uuid::new_v4().to_string();
+            client::connect(options.connect_addr(), &player_id, &player_id).await?;
         }
         options::Mode::Find(_) => {
             client::find().await?;
@@ -78,7 +82,9 @@ async fn main() -> anyhow::Result<()> {
             util::wait_for_signal(ready_receiver).await?;
 
             // run the client
-            client::connect(options.connect_addr()).await?;
+            // TODO: allow optional CLI arg for the player id
+            let player_id = Uuid::new_v4().to_string();
+            client::connect(options.connect_addr(), &player_id, &player_id).await?;
 
             shutdown_sender.send(true)?;
 

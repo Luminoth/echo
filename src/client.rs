@@ -27,17 +27,28 @@ async fn handle_event(event: Event, stream: &mut TcpStream) -> anyhow::Result<()
     Ok(())
 }
 
-pub async fn connect(addr: impl AsRef<str>) -> anyhow::Result<()> {
-    let player_session_id = Uuid::new_v4();
+pub async fn connect(
+    addr: impl AsRef<str>,
+    player_id: impl AsRef<str>,
+    player_session_id: impl AsRef<str>,
+) -> anyhow::Result<()> {
+    let player_id = player_id.as_ref();
+    let player_session_id = player_session_id.as_ref();
 
-    info!("{} connecting to {} ...", player_session_id, addr.as_ref());
+    info!(
+        "{} connecting to {} ({}) ...",
+        player_id,
+        addr.as_ref(),
+        player_session_id
+    );
     let mut stream = TcpStream::connect(addr.as_ref()).await?;
     info!("Success!");
 
+    // TODO: send player id
+
     // first thing we send is our player session id
-    stream
-        .write_all(player_session_id.to_string().as_bytes())
-        .await?;
+    stream.write_u8(player_session_id.len() as u8).await?;
+    stream.write_all(player_session_id.as_bytes()).await?;
 
     let mut buf = [0; 1024];
     let mut stdin = BufReader::new(stdin()).lines();
@@ -76,24 +87,20 @@ pub async fn find() -> anyhow::Result<()> {
 
     let shared_config = aws_config::from_env().load().await;
 
-    let player_session_id = Uuid::new_v4();
+    let player_id = Uuid::new_v4().to_string();
 
     let client = Client::new(&shared_config);
     let output = client
         .start_matchmaking()
         .configuration_name("echo")
-        .players(
-            Player::builder()
-                .player_id(player_session_id.to_string())
-                .build(),
-        )
+        .players(Player::builder().player_id(&player_id).build())
         .send()
         .await?;
 
     let mut ticket = output.matchmaking_ticket.unwrap();
     print_ticket(&ticket);
 
-    let connect_addr;
+    let connection_info;
 
     let ticket_id = ticket.ticket_id.unwrap();
     loop {
@@ -119,20 +126,30 @@ pub async fn find() -> anyhow::Result<()> {
             | MatchmakingConfigurationStatus::Searching
             | MatchmakingConfigurationStatus::Placing => print_ticket(&ticket),
             MatchmakingConfigurationStatus::Completed => {
-                let connection_info = ticket.game_session_connection_info.as_ref().unwrap();
-                connect_addr = Some(format!(
-                    "{}:{}",
-                    connection_info.ip_address.as_ref().unwrap(),
-                    connection_info.port.unwrap()
-                ));
+                connection_info = ticket.game_session_connection_info.clone();
+
                 break;
             }
             _ => unreachable!(),
         }
     }
 
-    info!("Found a match!");
-    connect(connect_addr.unwrap()).await?;
+    info!("Found a match: {:?}", connection_info);
+
+    let connection_info = connection_info.as_ref().unwrap();
+
+    let connect_addr = Some(format!(
+        "{}:{}",
+        connection_info.ip_address.as_ref().unwrap(),
+        connection_info.port.unwrap()
+    ));
+
+    let player_session_id = connection_info.matched_player_sessions().as_ref().unwrap()[0]
+        .player_session_id
+        .clone()
+        .unwrap();
+
+    connect(connect_addr.unwrap(), player_id, player_session_id).await?;
 
     Ok(())
 }
