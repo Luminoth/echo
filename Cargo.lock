@@ -240,7 +240,7 @@ dependencies = [
  "percent-encoding",
  "regex",
  "ring",
- "time",
+ "time 0.3.5",
  "tracing",
 ]
 
@@ -341,7 +341,7 @@ dependencies = [
  "itoa 0.4.8",
  "num-integer",
  "ryu",
- "time",
+ "time 0.3.5",
 ]
 
 [[package]]
@@ -427,6 +427,19 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "chrono"
+version = "0.4.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+dependencies = [
+ "libc",
+ "num-integer",
+ "num-traits",
+ "time 0.1.43",
+ "winapi",
+]
 
 [[package]]
 name = "console-api"
@@ -562,6 +575,7 @@ dependencies = [
  "aws-config",
  "aws-gamelift-server-sdk-rs",
  "aws-sdk-gamelift",
+ "chrono",
  "console-subscriber",
  "derive_more",
  "futures-util",
@@ -1685,6 +1699,16 @@ dependencies = [
 
 [[package]]
 name = "time"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
+name = "time"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41effe7cfa8af36f439fac33861b66b049edc6f9a32331e2312660529c1c24ad"
@@ -1893,7 +1917,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94571df2eae3ed4353815ea5a90974a594a1792d8782ff2cbcc9392d1101f366"
 dependencies = [
  "crossbeam-channel",
- "time",
+ "time 0.3.5",
  "tracing-subscriber",
 ]
 

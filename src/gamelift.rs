@@ -6,7 +6,7 @@ use aws_gamelift_server_sdk_rs::{
 };
 use futures_util::FutureExt;
 use tokio::sync::{mpsc, watch, RwLock};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::server;
 
@@ -125,7 +125,7 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
             }),
             on_health_check: Box::new(|| {
                 async move {
-                    info!("health check");
+                    debug!("health check");
                     true
                 }
                 .boxed()
