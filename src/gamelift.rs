@@ -59,17 +59,14 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                             move |player_session_id| {
                                 let api = api.clone();
                                 async move {
-                                    // TODO: have to spawn to get around the internal SDK lock being held
-                                    tokio::spawn(async move {
-                                        if let Err(err) = api
-                                            .write()
-                                            .await
-                                            .accept_player_session(player_session_id)
-                                            .await
-                                        {
-                                            error!("Player session accept error: {}", err);
-                                        }
-                                    });
+                                    if let Err(err) = api
+                                        .write()
+                                        .await
+                                        .accept_player_session(player_session_id)
+                                        .await
+                                    {
+                                        error!("Player session accept error: {}", err);
+                                    }
                                 }
                                 .boxed()
                             }
@@ -79,17 +76,14 @@ pub async fn run(port: u16) -> anyhow::Result<()> {
                             move |player_session_id| {
                                 let api = api.clone();
                                 async move {
-                                    // TODO: have to spawn to get around the internal SDK lock being held
-                                    tokio::spawn(async move {
-                                        if let Err(err) = api
-                                            .write()
-                                            .await
-                                            .remove_player_session(player_session_id)
-                                            .await
-                                        {
-                                            error!("Player session remove error: {}", err);
-                                        }
-                                    });
+                                    if let Err(err) = api
+                                        .write()
+                                        .await
+                                        .remove_player_session(player_session_id)
+                                        .await
+                                    {
+                                        error!("Player session remove error: {}", err);
+                                    }
                                 }
                                 .boxed()
                             }
