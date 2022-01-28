@@ -42,22 +42,28 @@ async fn main() -> anyhow::Result<()> {
     let (shutdown_sender, shutdown_receiver) = watch::channel(false);
 
     match options.mode {
-        options::Mode::Connect(_) => {
-            // TODO: allow optional CLI arg for the player id and player session id
-            // so that GameLift local testing can function correctly
+        options::Mode::Connect(cmd) => {
             let player_id = Uuid::new_v4().to_string();
-            client::connect(options.connect_addr(), &player_id, &player_id).await?;
+            client::connect(cmd.connect_addr(), &player_id).await?;
+        }
+        options::Mode::CreateGameLift(cmd) => {
+            let player_id = Uuid::new_v4().to_string();
+            client::create_gamelift(cmd.fleet_id, &player_id, cmd.local).await?;
+        }
+        options::Mode::ConnectGameLift(cmd) => {
+            let player_id = Uuid::new_v4().to_string();
+            client::connect_gamelift(&player_id, cmd.session_id, cmd.local).await?;
         }
         options::Mode::Find(_) => {
             client::find().await?;
         }
-        options::Mode::Server(_) => {
+        options::Mode::Server(cmd) => {
             let (ready_sender, ready_receiver) = watch::channel(false);
             let ready_sender = Arc::new(Mutex::new(ready_sender));
 
             // spawn the server process
             let server_handle = tokio::spawn(server::run(
-                options.server_addr(),
+                cmd.server_addr(),
                 true,
                 shutdown_receiver,
                 server::ServerCallbacks {
@@ -84,15 +90,15 @@ async fn main() -> anyhow::Result<()> {
             // run the client
             // TODO: allow optional CLI arg for the player id
             let player_id = Uuid::new_v4().to_string();
-            client::connect(options.connect_addr(), &player_id, &player_id).await?;
+            client::connect(cmd.connect_addr(), &player_id).await?;
 
             shutdown_sender.send(true)?;
 
             server_handle.await??;
         }
-        options::Mode::Dedicated(_) => {
+        options::Mode::Dedicated(cmd) => {
             server::run(
-                options.server_addr(),
+                cmd.server_addr(),
                 false,
                 shutdown_receiver,
                 server::ServerCallbacks::default(),
@@ -101,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
             .await?;
         }
         options::Mode::GameLift(cmd) => {
-            gamelift::run(cmd.port).await?;
+            server::run_gamelift(cmd.port).await?;
         }
     };
 

@@ -1,7 +1,6 @@
 use anyhow::bail;
-use aws_sdk_gamelift::{
-    model::{MatchmakingConfigurationStatus, MatchmakingTicket, Player},
-    Client,
+use aws_sdk_gamelift::model::{
+    GameSession, MatchmakingConfigurationStatus, MatchmakingTicket, Player, PlayerSession,
 };
 use tokio::{
     io::{stdin, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -9,6 +8,8 @@ use tokio::{
 };
 use tracing::info;
 use uuid::Uuid;
+
+use crate::gamelift::new_client;
 
 #[derive(Debug)]
 enum Event {
@@ -27,7 +28,7 @@ async fn handle_event(event: Event, stream: &mut TcpStream) -> anyhow::Result<()
     Ok(())
 }
 
-pub async fn connect(
+async fn connect_server(
     addr: impl AsRef<str>,
     player_id: impl AsRef<str>,
     player_session_id: impl AsRef<str>,
@@ -73,6 +74,72 @@ pub async fn connect(
     }
 }
 
+pub async fn connect(addr: impl AsRef<str>, player_id: impl AsRef<str>) -> anyhow::Result<()> {
+    connect_server(addr, &player_id, &player_id).await
+}
+
+fn print_game_session(game_session: &GameSession) {
+    info!("Game Session: {:?}", game_session.game_session_id);
+}
+
+pub async fn create_gamelift(
+    fleet_id: impl AsRef<str>,
+    player_id: impl AsRef<str>,
+    local: bool,
+) -> anyhow::Result<()> {
+    info!("Creating GameLift server ...");
+
+    let client = new_client(local).await;
+
+    let output = client
+        .create_game_session()
+        .fleet_id(fleet_id.as_ref().to_owned())
+        .maximum_player_session_count(10)
+        .send()
+        .await?;
+
+    let game_session = output.game_session.unwrap();
+    print_game_session(&game_session);
+
+    let game_session_id = game_session.game_session_id.unwrap();
+
+    connect_gamelift(player_id, game_session_id, local).await
+}
+
+fn print_player_session(player_session: &PlayerSession) {
+    info!("Player Session: {:?}", player_session.player_session_id);
+}
+
+pub async fn connect_gamelift(
+    player_id: impl AsRef<str>,
+    session_id: impl AsRef<str>,
+    local: bool,
+) -> anyhow::Result<()> {
+    info!("Joining GameLift server ...");
+
+    let client = new_client(local).await;
+
+    let output = client
+        .create_player_session()
+        .game_session_id(session_id.as_ref().to_owned())
+        .player_id(player_id.as_ref().to_owned())
+        .send()
+        .await?;
+
+    let player_session = output.player_session.unwrap();
+    print_player_session(&player_session);
+
+    let player_session_id = player_session.player_session_id.unwrap();
+
+    let connect_addr = format!(
+        "{}:{}",
+        player_session.ip_address.unwrap(),
+        player_session.port.unwrap()
+    );
+
+    connect_server(connect_addr, player_id, player_session_id).await
+}
+
 fn print_ticket(ticket: &MatchmakingTicket) {
     info!("Ticket ID: {:?}", ticket.ticket_id);
     info!(
@@ -85,11 +152,10 @@ fn print_ticket(ticket: &MatchmakingTicket) {
 pub async fn find() -> anyhow::Result<()> {
     info!("Searching for server ...");
 
-    let shared_config = aws_config::from_env().load().await;
-
     let player_id = Uuid::new_v4().to_string();
 
-    let client = Client::new(&shared_config);
+    let client = new_client(false).await;
+
     let output = client
         .start_matchmaking()
         .configuration_name("echo")
@@ -102,6 +168,7 @@ pub async fn find() -> anyhow::Result<()> {
 
     let connection_info;
 
+    // poll until we find a match or timeout
     let ticket_id = ticket.ticket_id.unwrap();
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
@@ -149,7 +216,7 @@ pub async fn find() -> anyhow::Result<()> {
         .clone()
         .unwrap();
 
-    connect(connect_addr.unwrap(), player_id, player_session_id).await?;
+    connect_server(connect_addr.unwrap(), player_id, player_session_id).await?;
 
     Ok(())
 }

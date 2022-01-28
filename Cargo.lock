@@ -581,6 +581,7 @@ dependencies = [
  "console-subscriber",
  "derive_more",
  "futures-util",
+ "http",
  "tokio",
  "tracing",
  "tracing-appender",

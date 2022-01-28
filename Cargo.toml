@@ -15,6 +15,7 @@ chrono = "0.4"
 console-subscriber = "0.1"
 derive_more = "0.99"
 futures-util = "0.3"
+http = "0.2"
 tokio = { version = "1.15", features = ["full", "tracing"] }
 tracing = "0.1"
 tracing-appender = "0.2"
