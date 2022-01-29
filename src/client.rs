@@ -83,13 +83,16 @@ fn print_game_session(game_session: &GameSession) {
 }
 
 pub async fn create_gamelift(
+    region: impl Into<String>,
     fleet_id: impl AsRef<str>,
     player_id: impl AsRef<str>,
     local: bool,
 ) -> anyhow::Result<()> {
     info!("Creating GameLift server ...");
 
-    let client = new_client(local).await;
+    let region = region.into();
+
+    let client = new_client(region.clone(), local).await;
 
     let output = client
         .create_game_session()
@@ -103,7 +106,7 @@ pub async fn create_gamelift(
 
     let game_session_id = game_session.game_session_id.unwrap();
 
-    connect_gamelift(player_id, game_session_id, local).await
+    connect_gamelift(region, player_id, game_session_id, local).await
 }
 
 fn print_player_session(player_session: &PlayerSession) {
@@ -111,13 +114,14 @@ fn print_player_session(player_session: &PlayerSession) {
 }
 
 pub async fn connect_gamelift(
+    region: impl Into<String>,
     player_id: impl AsRef<str>,
     session_id: impl AsRef<str>,
     local: bool,
 ) -> anyhow::Result<()> {
     info!("Joining GameLift server ...");
 
-    let client = new_client(local).await;
+    let client = new_client(region, local).await;
 
     let output = client
         .create_player_session()
@@ -149,12 +153,12 @@ fn print_ticket(ticket: &MatchmakingTicket) {
     info!("Estimated wait: {:?}", ticket.estimated_wait_time);
 }
 
-pub async fn find() -> anyhow::Result<()> {
+pub async fn find(region: impl Into<String>) -> anyhow::Result<()> {
     info!("Searching for server ...");
 
     let player_id = Uuid::new_v4().to_string();
 
-    let client = new_client(false).await;
+    let client = new_client(region, false).await;
 
     let output = client
         .start_matchmaking()

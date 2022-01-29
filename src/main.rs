@@ -39,6 +39,9 @@ async fn main() -> anyhow::Result<()> {
         Some(init_logging()?)
     };
 
+    // TODO: make this configurable
+    let region = String::from("us-west-2");
+
     let (shutdown_sender, shutdown_receiver) = watch::channel(false);
 
     match options.mode {
@@ -48,14 +51,14 @@ async fn main() -> anyhow::Result<()> {
         }
         options::Mode::CreateGameLift(cmd) => {
             let player_id = Uuid::new_v4().to_string();
-            client::create_gamelift(cmd.fleet_id, &player_id, cmd.local).await?;
+            client::create_gamelift(region, cmd.fleet_id, &player_id, cmd.local).await?;
         }
         options::Mode::ConnectGameLift(cmd) => {
             let player_id = Uuid::new_v4().to_string();
-            client::connect_gamelift(&player_id, cmd.session_id, cmd.local).await?;
+            client::connect_gamelift(region, &player_id, cmd.session_id, cmd.local).await?;
         }
         options::Mode::Find(_) => {
-            client::find().await?;
+            client::find(region).await?;
         }
         options::Mode::Server(cmd) => {
             let (ready_sender, ready_receiver) = watch::channel(false);
