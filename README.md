@@ -12,3 +12,7 @@
     * aws gamelift describe-instances --endpoint-url http://localhost:8080 --fleet-id fleet-123
 * Requires musl target for building packages
   * Requires musl-tools to be installed
+
+## FlexMatch config
+
+* Attached to GameLift queue (echo-queue)

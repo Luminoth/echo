@@ -1,0 +1,13 @@
+{
+    "name": "echo",
+    "ruleLanguageVersion": "1.0",
+    "playerAttributes": [],
+    "teams": [
+        {
+            "name": "players",
+            "maxPlayers": 1,
+            "minPlayers": 1
+        }
+    ],
+    "rules": []
+}
