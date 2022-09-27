@@ -7,6 +7,9 @@ pub enum Mode {
     #[display(fmt = "Connect")]
     Connect(ConnectCommand),
 
+    #[display(fmt = "CreateGameLiftLocal")]
+    CreateGameLiftLocal(CreateGameLiftLocalCommand),
+
     #[display(fmt = "CreateGameLift")]
     CreateGameLift(CreateGameLiftCommand),
 
@@ -50,16 +53,21 @@ fn default_host() -> String {
 }
 
 #[derive(FromArgs, PartialEq, Eq, Debug)]
-/// Create a new GameLift session and connect client to it
-#[argh(subcommand, name = "gamelift-create")]
-pub struct CreateGameLiftCommand {
+/// Create a new GameLift local session and connect client to it
+#[argh(subcommand, name = "gamelift-create-local")]
+pub struct CreateGameLiftLocalCommand {
     /// the gamelift fleetid to create the session on
     #[argh(option)]
     pub fleet_id: String,
+}
 
-    /// use GameLift local
-    #[argh(switch)]
-    pub local: bool,
+#[derive(FromArgs, PartialEq, Eq, Debug)]
+/// Create a new GameLift session and connect client to it
+#[argh(subcommand, name = "gamelift-create")]
+pub struct CreateGameLiftCommand {
+    /// the gamelift queue to create the session on
+    #[argh(option)]
+    pub queue_name: String,
 }
 
 #[derive(FromArgs, PartialEq, Eq, Debug)]

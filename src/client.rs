@@ -1,6 +1,7 @@
 use anyhow::bail;
 use aws_sdk_gamelift::model::{
-    GameSession, MatchmakingConfigurationStatus, MatchmakingTicket, Player, PlayerSession,
+    DesiredPlayerSession, GameSession, GameSessionPlacement, GameSessionPlacementState,
+    MatchmakingConfigurationStatus, MatchmakingTicket, Player, PlayerSession,
 };
 use tokio::{
     io::{stdin, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -82,17 +83,16 @@ fn print_game_session(game_session: &GameSession) {
     info!("Game Session: {:?}", game_session.game_session_id);
 }
 
-pub async fn create_gamelift(
+pub async fn create_gamelift_local(
     region: impl Into<String>,
     fleet_id: impl AsRef<str>,
     player_id: impl AsRef<str>,
-    local: bool,
 ) -> anyhow::Result<()> {
-    info!("Creating GameLift server ...");
+    info!("Creating GameLift server (local) ...");
 
     let region = region.into();
 
-    let client = new_client(region.clone(), local).await;
+    let client = new_client(region.clone(), true).await;
 
     let output = client
         .create_game_session()
@@ -106,7 +106,81 @@ pub async fn create_gamelift(
 
     let game_session_id = game_session.game_session_id.unwrap();
 
-    connect_gamelift(region, player_id, game_session_id, local).await
+    connect_gamelift(region, player_id, game_session_id, true).await
+}
+
+fn print_game_session_placement(game_session_placement: &GameSessionPlacement) {
+    info!("Placement ID: {:?}", game_session_placement.placement_id);
+    info!("Status: {:?}", game_session_placement.status);
+}
+
+pub async fn create_gamelift(
+    region: impl Into<String>,
+    queue_name: impl Into<String>,
+    player_id: impl Into<String>,
+) -> anyhow::Result<()> {
+    info!("Creating GameLift server ...");
+
+    let region = region.into();
+    let player_id = player_id.into();
+
+    let placement_id = Uuid::new_v4().to_string();
+
+    let client = new_client(region.clone(), false).await;
+
+    let output = client
+        .start_game_session_placement()
+        .game_session_queue_name(queue_name)
+        .placement_id(placement_id.clone())
+        .desired_player_sessions(
+            DesiredPlayerSession::builder()
+                .player_id(player_id.clone())
+                .build(),
+        )
+        .maximum_player_session_count(10)
+        .send()
+        .await?;
+
+    let game_session_placement = output.game_session_placement.unwrap();
+    print_game_session_placement(&game_session_placement);
+
+    let game_session_id;
+
+    // poll until the session is placed or timeout
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+        let output = client
+            .describe_game_session_placement()
+            .placement_id(placement_id.clone())
+            .send()
+            .await?;
+
+        let game_session_placement = output.game_session_placement.as_ref().unwrap();
+
+        let status = game_session_placement.status.as_ref().unwrap();
+        match status {
+            GameSessionPlacementState::Cancelled
+            | GameSessionPlacementState::Failed
+            | GameSessionPlacementState::TimedOut
+            | GameSessionPlacementState::Unknown(_) => bail!("Find failed: {:?}", status),
+            GameSessionPlacementState::Pending => {
+                print_game_session_placement(game_session_placement)
+            }
+            GameSessionPlacementState::Fulfilled => {
+                game_session_id = game_session_placement.game_session_id.clone();
+
+                break;
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    info!("Session placed: {:?}", game_session_id);
+
+    let game_session_id = game_session_id.unwrap();
+
+    connect_gamelift(region, player_id, game_session_id, false).await
 }
 
 fn print_player_session(player_session: &PlayerSession) {
@@ -167,7 +241,7 @@ pub async fn find(region: impl Into<String>) -> anyhow::Result<()> {
         .send()
         .await?;
 
-    let mut ticket = output.matchmaking_ticket.unwrap();
+    let ticket = output.matchmaking_ticket.unwrap();
     print_ticket(&ticket);
 
     let connection_info;
@@ -183,19 +257,17 @@ pub async fn find(region: impl Into<String>) -> anyhow::Result<()> {
             .send()
             .await?;
 
-        ticket = output.ticket_list.unwrap().first().unwrap().clone();
+        let ticket = output.ticket_list.as_ref().unwrap().first().unwrap();
 
         let status = ticket.status.as_ref().unwrap();
         match status {
             MatchmakingConfigurationStatus::Cancelled
             | MatchmakingConfigurationStatus::Failed
             | MatchmakingConfigurationStatus::TimedOut
-            | MatchmakingConfigurationStatus::Unknown(_) => {
-                bail!("Find failed: {:?}", status);
-            }
+            | MatchmakingConfigurationStatus::Unknown(_) => bail!("Find failed: {:?}", status),
             MatchmakingConfigurationStatus::Queued
             | MatchmakingConfigurationStatus::Searching
-            | MatchmakingConfigurationStatus::Placing => print_ticket(&ticket),
+            | MatchmakingConfigurationStatus::Placing => print_ticket(ticket),
             MatchmakingConfigurationStatus::Completed => {
                 connection_info = ticket.game_session_connection_info.clone();
 
@@ -207,7 +279,7 @@ pub async fn find(region: impl Into<String>) -> anyhow::Result<()> {
 
     info!("Found a match: {:?}", connection_info);
 
-    let connection_info = connection_info.as_ref().unwrap();
+    let connection_info = connection_info.unwrap();
 
     let connect_addr = Some(format!(
         "{}:{}",
@@ -220,7 +292,5 @@ pub async fn find(region: impl Into<String>) -> anyhow::Result<()> {
         .clone()
         .unwrap();
 
-    connect_server(connect_addr.unwrap(), player_id, player_session_id).await?;
-
-    Ok(())
+    connect_server(connect_addr.unwrap(), player_id, player_session_id).await
 }

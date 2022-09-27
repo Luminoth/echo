@@ -49,9 +49,13 @@ async fn main() -> anyhow::Result<()> {
             let player_id = Uuid::new_v4().to_string();
             client::connect(cmd.connect_addr(), &player_id).await?;
         }
+        options::Mode::CreateGameLiftLocal(cmd) => {
+            let player_id = Uuid::new_v4().to_string();
+            client::create_gamelift_local(region, cmd.fleet_id, &player_id).await?;
+        }
         options::Mode::CreateGameLift(cmd) => {
             let player_id = Uuid::new_v4().to_string();
-            client::create_gamelift(region, cmd.fleet_id, &player_id, cmd.local).await?;
+            client::create_gamelift(region, cmd.queue_name, &player_id).await?;
         }
         options::Mode::ConnectGameLift(cmd) => {
             let player_id = Uuid::new_v4().to_string();
