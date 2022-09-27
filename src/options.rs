@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use derive_more::Display;
 
-#[derive(FromArgs, PartialEq, Debug, Display)]
+#[derive(FromArgs, PartialEq, Eq, Debug, Display)]
 #[argh(subcommand)]
 pub enum Mode {
     #[display(fmt = "Connect")]
@@ -26,7 +26,7 @@ pub enum Mode {
     GameLift(GameLiftCommand),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Connect client to a dedicated server
 #[argh(subcommand, name = "connect")]
 pub struct ConnectCommand {
@@ -49,7 +49,7 @@ fn default_host() -> String {
     "127.0.0.1".to_string()
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Create a new GameLift session and connect client to it
 #[argh(subcommand, name = "gamelift-create")]
 pub struct CreateGameLiftCommand {
@@ -62,7 +62,7 @@ pub struct CreateGameLiftCommand {
     pub local: bool,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Connect client to a GameLift dedicated server
 #[argh(subcommand, name = "gamelift-connect")]
 pub struct ConnectGameLiftCommand {
@@ -75,12 +75,12 @@ pub struct ConnectGameLiftCommand {
     pub local: bool,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Search for a GameLift server to connect to
 #[argh(subcommand, name = "find")]
 pub struct FindCommand {}
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Run as combined client and server
 #[argh(subcommand, name = "server")]
 pub struct ServerCommand {
@@ -99,7 +99,7 @@ impl ServerCommand {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Run as dedicated server
 #[argh(subcommand, name = "dedicated")]
 pub struct DedicatedCommand {
@@ -114,7 +114,7 @@ impl DedicatedCommand {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(FromArgs, PartialEq, Eq, Debug)]
 /// Run as dedicated server on AWS GameLift
 #[argh(subcommand, name = "gamelift")]
 pub struct GameLiftCommand {
