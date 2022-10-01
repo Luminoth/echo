@@ -12,7 +12,9 @@ mkdir build
 
 cp install.sh build
 
-cargo install --target x86_64-unknown-linux-musl --path . --root build/
+cd echo
+cargo install --target x86_64-unknown-linux-musl --path . --root ../build/
+cd -
 rm build/.crates*
 
 cd build
