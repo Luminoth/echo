@@ -16,3 +16,8 @@
 ## FlexMatch config
 
 * Attached to GameLift queue (echo-queue)
+
+# Notifications
+
+* cargo install cargo-lambda
+* build-lambda.sh will install Zig (using Python) if it isn't already installed
